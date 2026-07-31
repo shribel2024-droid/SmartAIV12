@@ -1,0 +1,83 @@
+name: Build SmartAI APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Linux Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            zip unzip git wget curl \
+            build-essential \
+            autoconf automake libtool pkg-config \
+            libffi-dev libssl-dev \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            cmake
+
+      - name: Install Python Packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install Cython==0.29.37
+          pip install buildozer
+
+      - name: Install Android SDK
+        run: |
+          mkdir -p $HOME/android-sdk
+          cd $HOME
+
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+
+          unzip commandlinetools-linux-11076708_latest.zip
+
+          mkdir -p android-sdk/cmdline-tools
+
+          mv cmdline-tools android-sdk/cmdline-tools/latest
+
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager \
+            --sdk_root=$HOME/android-sdk \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2" \
+            "ndk;25.2.9519653"
+
+      - name: Accept Licenses
+        run: |
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager \
+          --sdk_root=$HOME/android-sdk --licenses
+
+      - name: Build APK
+        env:
+          ANDROIDSDK: $HOME/android-sdk
+          ANDROID_NDK_HOME: $HOME/android-sdk/ndk/25.2.9519653
+
+        run: |
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartAI-APK
+          path: bin/*.apk
